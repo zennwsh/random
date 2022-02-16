@@ -4,6 +4,7 @@
 # These functions work for data with a binary target variable. 
 ####################
 
+#### Information gain ----- 
 # This function was written and provided to us by Professor Daniel Neill for a homework assignment. 
 
 def InformationGain(goodY,badY,goodN,badN):
