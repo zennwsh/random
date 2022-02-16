@@ -1,0 +1,131 @@
+####################
+# This script provides the documentation for a few user-created functions
+# that help one manually fit a decision tree using only pandas and numpy. 
+# These functions work for data with a binary target variable. 
+####################
+
+# This function was written and provided to us by Professor Daniel Neill for a homework assignment. 
+
+def InformationGain(goodY,badY,goodN,badN):
+    import numpy as np 
+    def F(X,Y):
+        val1 = X*np.log2(1.*(X+Y)/X) if X>0 else 0
+        val2 = Y*np.log2(1.*(X+Y)/Y) if Y>0 else 0
+        return val1+val2
+    return (F(goodY+goodN,badY+badN)-F(goodY,badY)-F(goodN,badN)) / (goodY+goodN+badY+badN)
+
+#### Information gain per possible split ----- 
+# This function explores possible splits, based on the variables present in the df,
+# and the information gain from each split. 
+
+discrete = [] # pass a list of discrete variable names 
+target = '' # pass a string of target variable name. must be binary
+real = [] # pass a string of continuous variable names 
+
+def binarizeAll(df):   
+    import pandas as pd 
+    
+    lst = []
+    t1 = list(df[target].unique())[0]
+    t2 = list(df[target].unique())[1]
+    
+    # for discrete variables 
+    for var in discrete:     
+        
+        for i in list(df[var].unique()):
+                x = len(df[(df[var]==i) & (df[target]==t1)])
+                y = len(df[(df[var]==i) & (df[target]==t2)])
+                z = len(df[(df[var]!=i) & (df[target]==t1)])
+                a = len(df[(df[var]!=i) & (df[target]==t2)])
+            
+                lst.append([var, i, round(InformationGain(x,y,z,a), 3)])
+ 
+    n = len(df)
+    
+    # for the real variable 
+    for var in list(df[var].unique()): 
+        mids = [df[var].sort_values(ascending=True).reset_index().drop('index', axis=1).iat[x,0] 
+                for x in range(4,n,4)]
+        
+        for i in mids:
+            x = len(df[(df[var]>=i) & (df[target]==t1)])
+            y = len(df[(df[var]>=i) & (df[target]==t2)])
+            z = len(df[(df[var]<i) & (df[target]==t1)])
+            a = len(df[(df[var]<i) & (df[target]==t2)])
+            
+            lst.append([var, i, round(InformationGain(x,y,z,a), 3)])
+        
+    info = pd.dfFrame(lst, columns=['var','split', 'infogain'])
+            
+    return info    
+
+#### Resulting nodes for one split ----- 
+
+def dfSplit(df,var,i,to_print):
+    
+    t1 = list(df[target].unique())[0]
+    t2 = list(df[target].unique())[1]
+    
+    if var in real:
+        x = len(df[(df[var]>=i) & (df[target]==t1)])
+        y = len(df[(df[var]>=i) & (df[target]==t2)])
+        z = len(df[(df[var]<i) & (df[target]==t1)])
+        a = len(df[(df[var]<i) & (df[target]==t2)])
+    else:
+        x = len(df[(df[var]==i) & (df[target]==t1)])
+        y = len(df[(df[var]==i) & (df[target]==t2)])
+        z = len(df[(df[var]!=i) & (df[target]==t1)])
+        a = len(df[(df[var]!=i) & (df[target]==t2)])
+        
+    dfsplit = [x,y,z,a]
+    
+    return pd.DataFrame(dfSplit, columns=[t1+'True',t2+'True', t1+'False',t2+'False'])            
+
+#### Creating the tree ----- 
+def split(data):
+    while len(data) != 0:
+        # while 
+        
+        # calculate infogain 
+        info = binarizeAll(data)
+        
+        # get largest infogain
+        var, split, infogain = info.sort_values(by='infogain', ascending=False).iloc[0,:]
+        
+        # get length of each node-good/bad permutation after split 
+        x,y,z,a = dataSplit(data, var, split, to_print=False)
+        datasplit = [x,y,z,a]
+        
+        ### output: 
+        if var=='HP':
+            print('Split by ', var, ' ≥ ', split,' for information gain of ', infogain, '. ', datasplit, sep='')
+            
+        else: 
+            print('Split by ', var, ' = ', split,' for information gain of ', infogain, '. ', datasplit, sep='')
+        ####### 
+        
+        
+        # identify permutation that requires further splitting 
+        if x==0 or y==0: # if data true at split are only either good or bad 
+            if var in discrete: # if variable is discrete 
+                data = data[data[var]!=split] 
+            else: # if variable is real 
+                data = data[data[var]<split]
+
+        elif z==0 or a==0: # if data false at split are only either good or bad 
+            if var in discrete: 
+                data = data[data[var]==split] 
+            else:
+                data = data[data[var]>=split]
+
+        # once perfectly split, we can break! 
+        if x==0 and z==0 or x==0 and a==0 or y==0 and z==0 or y==0 and a==0 or x+y==0 or a+z==0:
+            break
+        
+
+split(df)
+
+import io
+thefile = io.StringIO('MPG,cylinders,HP,weight\ngood,4,75,light\nbad,6,90,medium\nbad,4,110,medium\nbad,8,175,weighty\nbad,6,95,medium\nbad,4,94,light\nbad,4,95,light\nbad,8,139,weighty\nbad,8,190,weighty\nbad,8,145,weighty\nbad,6,100,medium\ngood,4,92,medium\nbad,6,100,weighty\nbad,8,170,weighty\ngood,4,89,medium\ngood,4,65,light\nbad,6,85,medium\ngood,4,81,light\nbad,6,95,medium\nbad,4,93,light')
+import pandas as pd
+df = pd.read_csv(thefile)
